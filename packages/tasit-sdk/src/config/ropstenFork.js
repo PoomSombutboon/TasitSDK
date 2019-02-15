@@ -1,8 +1,8 @@
-const local = {
+const ropstenFork = {
   provider: {
     network: "other",
     provider: "jsonrpc",
-    pollingInterval: 50,
+    pollingInterval: 250,
     jsonRpc: {
       url: "http://localhost",
       port: 8545,
@@ -13,4 +13,4 @@ const local = {
   },
 };
 
-module.exports = local;
+module.exports = ropstenFork;
