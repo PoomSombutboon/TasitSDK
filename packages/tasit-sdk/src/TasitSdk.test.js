@@ -10,24 +10,24 @@ import config from "./config/default";
 // in this test suite. Eventually, maybe ProviderFactory may move to
 // some shared helper dir.
 import ProviderFactory from "tasit-action/dist/ProviderFactory";
+
 import {
   mineBlocks,
   createSnapshot,
   revertFromSnapshot,
   confirmBalances,
-} from "tasit-action/dist/testHelpers/helpers";
-import {
   gasParams,
   setupContracts,
   setupWallets,
   duration,
   createEstatesFromParcels,
   getEstateSellOrder,
+  etherFaucet,
+  ownedManaFaucet,
+  constants,
 } from "./testHelpers/helpers";
 
-// in weis
-const ONE = 1e18;
-const TEN = 10e18;
+const { ONE, TEN } = constants;
 
 // Note: Extract Decentraland test cases to a specific test suite when other
 // use cases will be tested.
@@ -43,26 +43,6 @@ describe("Decentraland", () => {
   let snapshotId;
   let provider;
   let estateIds;
-
-  const manaFaucetTo = async (beneficiary, amountInWei) => {
-    manaContract.setWallet(ownerWallet);
-    const mintManaToBuyer = manaContract.mint(
-      beneficiary.address,
-      amountInWei.toString()
-    );
-    await mintManaToBuyer.waitForNonceToUpdate();
-    await confirmBalances(manaContract, [beneficiary.address], [amountInWei]);
-  };
-
-  const etherFaucetTo = async (beneficiary, amountInWei) => {
-    const connectedOwnerWallet = ownerWallet.connect(provider);
-    const tx = await connectedOwnerWallet.sendTransaction({
-      // ethers.utils.parseEther("1.0")
-      value: "0x0de0b6b3a7640000",
-      to: beneficiary.address,
-    });
-    await provider.waitForTransaction(tx.hash);
-  };
 
   before("", async () => {
     ConfigLoader.setConfig(config);
@@ -137,7 +117,7 @@ describe("Decentraland", () => {
     beforeEach(
       "buyer and seller approve marketplace contract to transfer tokens on their behalf",
       async () => {
-        manaFaucetTo(buyerWallet, TEN);
+        ownedManaFaucet(manaContract, ownerWallet, buyerWallet, TEN);
 
         manaContract.setWallet(buyerWallet);
         const marketplaceApprovalByBuyer = manaContract.approve(
@@ -256,8 +236,8 @@ describe("Decentraland", () => {
       });
 
       it("should buy an estate", async () => {
-        await manaFaucetTo(ephemeralWallet, TEN);
-        await etherFaucetTo(ephemeralWallet, ONE);
+        await ownedManaFaucet(manaContract, ownerWallet, ephemeralWallet, TEN);
+        await etherFaucet(provider, ownerWallet, ephemeralWallet, ONE);
 
         manaContract.setWallet(ephemeralWallet);
         const marketplaceApproval = manaContract.approve(

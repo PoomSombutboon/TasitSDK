@@ -1,21 +1,32 @@
+import { ethers } from "ethers";
 import { Account, Action } from "../TasitSdk";
 const { Contract, NFT, ERC20, ERC721, Marketplace } = Action;
 const { Mana } = ERC20;
 const { Estate, Land } = ERC721;
 const { Decentraland } = Marketplace;
 import { createFromPrivateKey } from "tasit-account/dist/testHelpers/helpers";
+import {
+  mineBlocks,
+  createSnapshot,
+  revertFromSnapshot,
+  confirmBalances,
+} from "tasit-action/dist/testHelpers/helpers";
 
 // Note: Should LandProxy exists as TasitAction contract object also?
 import { abi as landProxyABI } from "./abi/LANDProxy.json";
 
-import { local as localAddresses } from "../../../tasit-contracts/decentraland/addresses";
+import {
+  local as localAddresses,
+  ropsten as ropstenAddresses,
+} from "../../../tasit-contracts/decentraland/addresses";
+
 const {
-  MANAToken: MANA_ADDRESS,
-  LANDRegistry: LAND_ADDRESS,
-  LANDProxy: LAND_PROXY_ADDRESS,
-  EstateRegistry: ESTATE_ADDRESS,
-  Marketplace: MARKETPLACE_ADDRESS,
-} = localAddresses;
+  utils: ethersUtils,
+  constants: ethersConstants,
+  Contract: ethersContract,
+} = ethers;
+const { WeiPerEther } = ethersConstants;
+const { bigNumberify } = ethersUtils;
 
 const FULLNFT_ADDRESS = "0x0E86f209729bf54763789CDBcA9E8b94f0FD5333";
 
@@ -44,6 +55,14 @@ const setupWallets = () => {
 };
 
 const setupContracts = async ownerWallet => {
+  const {
+    MANAToken: MANA_ADDRESS,
+    LANDRegistry: LAND_ADDRESS,
+    LANDProxy: LAND_PROXY_ADDRESS,
+    EstateRegistry: ESTATE_ADDRESS,
+    Marketplace: MARKETPLACE_ADDRESS,
+  } = localAddresses;
+
   // Note: It would be cooler to use NFT here if
   // Decentraland Land contract followed ERC721 exactly
   const landContract = new Land(LAND_ADDRESS, ownerWallet);
@@ -229,7 +248,67 @@ const duration = {
   },
 };
 
+const etherFaucet = async (provider, fromWallet, beneficiary, amountInWei) => {
+  const connectedFromWallet = fromWallet.connect(provider);
+  const tx = await connectedFromWallet.sendTransaction({
+    // ethers.utils.parseEther("1.0")
+    value: "0x0de0b6b3a7640000",
+    to: beneficiary.address,
+  });
+  await provider.waitForTransaction(tx.hash);
+};
+
+const ownedManaFaucet = async (
+  manaContract,
+  ownerWallet,
+  beneficiary,
+  amountInWei
+) => {
+  manaContract.setWallet(ownerWallet);
+  const mintManaToBuyer = manaContract.mint(
+    beneficiary.address,
+    amountInWei.toString()
+  );
+  await mintManaToBuyer.waitForNonceToUpdate();
+  await confirmBalances(manaContract, [beneficiary.address], [amountInWei]);
+};
+
+// Normalize and compare addresses
+const addressesAreEqual = (address1, address2) => {
+  return ethersUtils.getAddress(address1) === ethersUtils.getAddress(address2);
+};
+
+// The Mana contract deployed on ropsten network has a setBalance function
+const ropstenManaFaucet = async (provider, walletWithGas, to, amountInWei) => {
+  const { MANAToken: MANA_ADDRESS } = ropstenAddresses;
+  const connectedWallet = walletWithGas.connect(provider);
+  const manaABI = ["function setBalance(address to, uint256 amount)"];
+  const mana = new ethersContract(MANA_ADDRESS, manaABI, connectedWallet);
+  const tx = await mana.setBalance(to.address, amountInWei);
+  await provider.waitForTransaction(tx.hash);
+};
+
+// In weis
+// Note: ethers.js uses BigNumber internally
+// That accepts decimal strings (Ref: https://docs.ethers.io/ethers.js/html/api-utils.html#creating-instances)
+// Scientific notation works if the number is small enough (< 1e21) to be converted to string properly
+// See more: https://github.com/ethers-io/ethers.js/issues/228
+const ONE = bigNumberify(1).mul(WeiPerEther);
+const TEN = bigNumberify(10).mul(WeiPerEther);
+const BILLION = bigNumberify(`${1e9}`).mul(WeiPerEther);
+
+const constants = {
+  ONE,
+  TEN,
+  BILLION,
+  WeiPerEther,
+};
+
 export {
+  mineBlocks,
+  createSnapshot,
+  revertFromSnapshot,
+  confirmBalances,
   gasParams,
   setupWallets,
   setupContracts,
@@ -237,4 +316,10 @@ export {
   createParcels,
   createEstatesFromParcels,
   getEstateSellOrder,
+  etherFaucet,
+  ownedManaFaucet,
+  ropstenManaFaucet,
+  addressesAreEqual,
+  bigNumberify,
+  constants,
 };

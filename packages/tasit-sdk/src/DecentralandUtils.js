@@ -1,16 +1,12 @@
 import { ethers } from "ethers";
 
 import { ropsten as ropstenAddresses } from "../../tasit-contracts/decentraland/addresses";
-const {
-  MarketplaceProxy: MARKETPLACE_ADDRESS,
-  MANAToken: MANA_ADDRESS,
-} = ropstenAddresses;
-
-// Note: Will be remove after Action Provider fixes
+const { MarketplaceProxy: MARKETPLACE_ADDRESS } = ropstenAddresses;
 import marketplaceABI from "../../tasit-action/src/abi/Marketplace.json";
 
+// That util class is been used to fetch data from Decentraland Marketplace contract
+// Fetching data likely will be replace to subgraph queries
 export default class DecentralandUtils {
-  // Note: Should we create Action.Contract.getABI() function?
   #marketplace;
   #mana;
   #provider;
@@ -27,7 +23,6 @@ export default class DecentralandUtils {
     );
   }
 
-  // TODO: Move to static function
   getOpenSellOrders = async fromBlock => {
     const [ordersCreated, ordersCancelled, ordersExecuted] = await Promise.all([
       this.#getCreatedSellOrders(fromBlock),
